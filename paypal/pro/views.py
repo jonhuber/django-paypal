@@ -7,14 +7,8 @@ from django.utils.http import urlencode
 
 from .forms import PaymentForm, ConfirmForm
 from .models import PayPalNVP
-from .helpers import PayPalWPP, TEST
+from .helpers import PayPalWPP, TEST, get_express_endpoint
 from .exceptions import PayPalFailure
-
-# PayPal Edit IPN URL:
-# https://www.sandbox.paypal.com/us/cgi-bin/webscr?cmd=_profile-ipn-notify
-EXPRESS_ENDPOINT = "https://www.paypal.com/webscr?cmd=_express-checkout&%s"
-SANDBOX_EXPRESS_ENDPOINT = \
-    "https://www.sandbox.paypal.com/webscr?cmd=_express-checkout&%s"
 
 
 class PayPalPro(object):
@@ -161,12 +155,6 @@ class PayPalPro(object):
         return render_to_response(
             self.payment_template, self.context, RequestContext(self.request))
 
-    def get_endpoint(self):
-        if TEST:
-            return SANDBOX_EXPRESS_ENDPOINT
-        else:
-            return EXPRESS_ENDPOINT
-
     def redirect_to_express(self):
         """
         First step of ExpressCheckout. Redirect the request to PayPal using the
@@ -182,7 +170,7 @@ class PayPalPro(object):
             pp_params = dict(token=nvp_obj.token, AMT=self.item['amt'],
                              RETURNURL=self.item['returnurl'],
                              CANCELURL=self.item['cancelurl'])
-            pp_url = self.get_endpoint() % urlencode(pp_params)
+            pp_url = get_express_endpoint() % urlencode(pp_params)
             return HttpResponseRedirect(pp_url)
 
     def render_confirm_form(self):

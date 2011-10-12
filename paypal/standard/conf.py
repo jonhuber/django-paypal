@@ -31,4 +31,3 @@ SUBSCRIPTION_SANDBOX_IMAGE = getattr(
 DONATION_SANDBOX_IMAGE = getattr(
     settings, "PAYPAL_DONATION_SANDBOX_IMAGE",
     "https://www.sandbox.paypal.com/en_US/i/btn/btn_donateCC_LG.gif")
-

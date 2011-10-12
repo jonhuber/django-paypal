@@ -17,7 +17,7 @@ from paypal.pro.models import PayPalNVP, L
 from paypal.pro.exceptions import PayPalFailure
 
 TEST = settings.PAYPAL_TEST
-USER = settings.PAYPAL_WPP_USER 
+USER = settings.PAYPAL_WPP_USER
 PASSWORD = settings.PAYPAL_WPP_PASSWORD
 SIGNATURE = settings.PAYPAL_WPP_SIGNATURE
 VERSION = 54.0
@@ -25,27 +25,34 @@ BASE_PARAMS = dict(USER=USER , PWD=PASSWORD, SIGNATURE=SIGNATURE, VERSION=VERSIO
 ENDPOINT = "https://api-3t.paypal.com/nvp"
 SANDBOX_ENDPOINT = "https://api-3t.sandbox.paypal.com/nvp"
 NVP_FIELDS = fields_for_model(PayPalNVP).keys()
-
+# PayPal Edit IPN URL:
+# https://www.sandbox.paypal.com/us/cgi-bin/webscr?cmd=_profile-ipn-notify
+EXPRESS_ENDPOINT = "https://www.paypal.com/webscr?cmd=_express-checkout&%s"
+SANDBOX_EXPRESS_ENDPOINT = \
+    "https://www.sandbox.paypal.com/webscr?cmd=_express-checkout&%s"
 
 def paypal_time(time_obj=None):
     """Returns a time suitable for PayPal time fields."""
     if time_obj is None:
         time_obj = time.gmtime()
     return time.strftime(PayPalNVP.TIMESTAMP_FORMAT, time_obj)
-    
+
 def paypaltime2datetime(s):
     """Convert a PayPal time string to a DateTime."""
     return datetime.datetime(*(time.strptime(s, PayPalNVP.TIMESTAMP_FORMAT)[:6]))
 
+def get_express_endpoint():
+    return SANDBOX_EXPRESS_ENDPOINT if TEST else EXPRESS_ENDPOINT
+
 
 class PayPalError(TypeError):
     """Error thrown when something be wrong."""
-    
+
 
 class PayPalWPP(object):
     """
     Wrapper class for the PayPal Website Payments Pro.
-    
+
     Website Payments Pro Integration Guide:
     https://cms.paypal.com/cms_content/US/en_US/files/developer/PP_WPP_IntegrationGuide.pdf
 
@@ -106,7 +113,7 @@ class PayPalWPP(object):
             raise PayPalFailure(nvp_obj.flag_info)
         payment_was_successful.send(params)
         return nvp_obj
-        
+
     def createRecurringPaymentsProfile(self, params, direct=False):
         """
         Set direct to True to indicate that this is being called as a directPayment.
@@ -122,7 +129,7 @@ class PayPalWPP(object):
             required + L("token payerid")
 
         nvp_obj = self._fetch(params, required, defaults)
-        
+
         # Flag if profile_type != ActiveProfile
         if nvp_obj.flag:
             raise PayPalFailure(nvp_obj.flag_info)
@@ -163,10 +170,10 @@ class PayPalWPP(object):
         if nvp_obj.flag:
             raise PayPalFailure(nvp_obj.flag_info)
         return nvp_obj
-    
+
     def billOutstandingAmount(self, params):
         raise NotImplementedError
-        
+
     def manangeRecurringPaymentsProfileStatus(self, params, fail_silently=False):
         """
         Requires `profileid` and `action` params.
@@ -188,7 +195,7 @@ class PayPalWPP(object):
         else:
             raise PayPalFailure(nvp_obj.flag_info)
         return nvp_obj
-        
+
     def refundTransaction(self, params):
         raise NotImplementedError
 
@@ -208,7 +215,7 @@ class PayPalWPP(object):
         for k in params.keys():
             if k in REMOVE:
                 del params[k]
-                
+
         return params
 
     def _fetch(self, params, required, defaults):
@@ -218,7 +225,7 @@ class PayPalWPP(object):
         pp_string = self.signature + urlencode(pp_params)
         response = self._request(pp_string)
         response_params = self._parse_response(response)
-        
+
         if getattr(settings, 'PAYPAL_DEBUG', settings.DEBUG):
             print 'PayPal Request:'
             pprint.pprint(defaults)
@@ -239,7 +246,7 @@ class PayPalWPP(object):
         nvp_obj.init(self.request, params, response_params)
         nvp_obj.save()
         return nvp_obj
-        
+
     def _request(self, data):
         """Moved out to make testing easier."""
         return urllib2.urlopen(self.endpoint, data).read()
@@ -251,7 +258,7 @@ class PayPalWPP(object):
         """
         for r in required:
             if r not in params:
-                raise PayPalError("Missing required param: %s" % r)    
+                raise PayPalError("Missing required param: %s" % r)
 
         # Upper case all the parameters for PayPal.
         return (dict((k.upper(), v) for k, v in params.iteritems()))
