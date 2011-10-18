@@ -77,14 +77,14 @@ class PayPalNVP(Model):
         self.response = urlencode(paypal_response)
 
         # Was there a flag on the play?
-        ack = paypal_response.get('ack', False)
+        ack = paypal_response.get('ACK', False)
         if ack != "Success":
             if ack == "SuccessWithWarning":
-                self.flag_info = paypal_response.get('l_longmessage0', '')
+                self.flag_info = paypal_response.get('L_LONGMESSAGE0', '')
             else:
                 self.set_flag(
-                    paypal_response.get('l_longmessage0', ''),
-                    paypal_response.get('l_errorcode', ''))
+                    paypal_response.get('L_LONGMESSAGE0', ''),
+                    paypal_response.get('L_ERRORCODE', ''))
 
     def set_flag(self, info, code=None):
         """Flag this instance for investigation."""
@@ -100,14 +100,14 @@ class PayPalNVP(Model):
 
         # Change the model information into a dict that PayPal can understand.
         params = model_to_dict(self, exclude=self.ADMIN_FIELDS)
-        params['acct'] = self.acct
-        params['creditcardtype'] = self.creditcardtype
-        params['expdate'] = self.expdate
-        params['cvv2'] = self.cvv2
+        params['ACCT'] = self.acct
+        params['CREDITCARDTYPE'] = self.creditcardtype
+        params['EXPDATE'] = self.expdate
+        params['CVV2'] = self.cvv2
         params.update(item)
 
         # Create recurring payment:
-        if 'billingperiod' in params:
+        if 'BILLINGPERIOD' in params:
             return wpp.createRecurringPaymentsProfile(params, direct=True)
         # Create single payment:
         else:

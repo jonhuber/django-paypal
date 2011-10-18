@@ -35,8 +35,9 @@ API_METHODS = {
     'DoDirectPayment': {
         'defaults': {"paymentaction": "Sale"},
         'required': (
-            "creditcardtype acct expdate cvv2 ipaddress firstname lastname "
-            "street city state countrycode zip amt").split(),
+            'CREDITCARDTYPE', 'ACCT', 'EXPDATE', 'CVV2', 'IPADDRESS',
+            'FIRSTNAME', 'LASTNAME', 'STREET', 'CITY', 'STATE', 'COUNTRYCODE',
+            'ZIP', 'AMT'),
         'signal': signals.payment_was_successful,
         },
     'SetExpressCheckout': {
@@ -56,7 +57,7 @@ API_METHODS = {
         'signal': signals.payment_was_successful,
         },
     'GetTransactionDetails': {
-        'required': ('transactionid',),
+        'required': ('TRANSACTIONID',),
         },
     'CreateRecurringPaymentsProfile': {
         'required': (
@@ -79,7 +80,8 @@ def paypal_time(time_obj=None):
 
 def paypaltime2datetime(s):
     """Convert a PayPal time string to a DateTime."""
-    return datetime.datetime(*(time.strptime(s, PayPalNVP.TIMESTAMP_FORMAT)[:6]))
+    return datetime.datetime(
+        *(time.strptime(s, PayPalNVP.TIMESTAMP_FORMAT)[:6]))
 
 def get_express_endpoint():
     return SANDBOX_EXPRESS_ENDPOINT if TEST else EXPRESS_ENDPOINT
@@ -94,10 +96,12 @@ class PayPalWPP(object):
     Wrapper class for the PayPal Website Payments Pro.
 
     Website Payments Pro Integration Guide:
-    https://cms.paypal.com/cms_content/US/en_US/files/developer/PP_WPP_IntegrationGuide.pdf
+    https://cms.paypal.com/cms_content/US/en_US/files/developer/
+    PP_WPP_IntegrationGuide.pdf
 
     Name-Value Pair API Developer Guide and Reference:
-    https://cms.paypal.com/cms_content/US/en_US/files/developer/PP_NVPAPI_DeveloperGuide.pdf
+    https://cms.paypal.com/cms_content/US/en_US/files/developer/
+    PP_NVPAPI_DeveloperGuide.pdf
     """
     def __init__(self, request=None, params=BASE_PARAMS):
         """Required - USER / PWD / SIGNATURE / VERSION"""
@@ -129,8 +133,7 @@ class PayPalWPP(object):
         """
         if self._is_recurring(params):
             params = self._recurring_setExpressCheckout_adapter(params)
-        self.api_call('SetExpressCheckout', params)
-        return nvp_obj
+        return self.api_call('SetExpressCheckout', params)
 
     def doExpressCheckoutPayment(self, params):
         """
@@ -147,8 +150,8 @@ class PayPalWPP(object):
         directPayment. Returns True PayPal successfully creates the profile
         otherwise False.
         """
-        extra_requirements = ('token',) if not direct else (
-            'creditcardtype', 'acct', 'expdate', 'firstname', 'lastname')
+        extra_requirements = ('TOKEN',) if not direct else (
+            'CREDITCARDTYPE', 'ACCT', 'EXPDATE', 'FIRSTNAME', 'LASTNAME')
 
         return self.api_call(
             'CreateRecurringPaymentsProfile', params,
@@ -189,8 +192,8 @@ class PayPalWPP(object):
     def manangeRecurringPaymentsProfileStatus(
         self, params, fail_silently=False):
         """
-        Requires `profileid` and `action` params.
-        Action must be either "Cancel", "Suspend", or "Reactivate".
+        Requires `PROFILEID` and `ACTION` params.
+        ACTION must be either "Cancel", "Suspend", or "Reactivate".
         """
         try:
             nvp = self.api_call('ManageRecurringPaymentsProfileStatus', params)
@@ -199,11 +202,11 @@ class PayPalWPP(object):
                 'Invalid profile status for cancel action; '
                 'profile should be active or suspended')):
                 raise
-        if params['action'] == 'Cancel':
+        if params['ACTION'] == 'Cancel':
             signals.recurring_cancel.send(self, params=params, nvp=nvp)
-        elif params['action'] == 'Suspend':
+        elif params['ACTION'] == 'Suspend':
             signals.recurring_suspend.send(self, params=params, nvp=nvp)
-        elif params['action'] == 'Reactivate':
+        elif params['ACTION'] == 'Reactivate':
             signals.recurring_reactivate.send(self, params=params, nvp=nvp)
         return nvp
 
@@ -212,7 +215,7 @@ class PayPalWPP(object):
 
     def _is_recurring(self, params):
         """Returns True if the item passed is a recurring transaction."""
-        return 'billingfrequency' in params
+        return 'BILLINGFREQUENCY' in params
 
     def _recurring_setExpressCheckout_adapter(self, params):
         """
@@ -220,11 +223,11 @@ class PayPalWPP(object):
         payment interface to ECP. This adapts a normal call to look like a
         SEC call.
         """
-        params['l_billingtype0'] = "RecurringPayments"
-        params['l_billingagreementdescription0'] = params['desc']
+        params['L_BILLINGTYPE0'] = "RecurringPayments"
+        params['L_BILLINGAGREEMENTDESCRIPTION0'] = params['DESC']
 
         REMOVE = (
-            'billingfrequency', 'billingperiod', 'profilestartdate', 'desc')
+            'BILLINGFREQUENCY', 'BILLINGPERIOD', 'PROFILESTARTDATE', 'DESC')
 
         for k in params.keys():
             if k in REMOVE:
@@ -236,12 +239,12 @@ class PayPalWPP(object):
         self, params, required=None, defaults=None, extra_requirements=None):
         """Make the NVP request and store the response."""
         if required is None or defaults is None:
-            assert params['method'] in API_METHODS
+            assert params['METHOD'] in API_METHODS
             if required is None:
-                required = API_METHODS[params['method']].get('required', ())
+                required = API_METHODS[params['METHOD']].get('required', ())
             if defaults is None:
-                defaults = API_METHODS[params['method']].get('defaults', ())
-        required.update(extra_requirements or {})
+                defaults = API_METHODS[params['METHOD']].get('defaults', {})
+        required += extra_requirements or ()
         defaults.update(params)
         pp_params = self._check_and_update_params(required, defaults)
         pp_string = self.signature + urlencode(pp_params)
@@ -256,9 +259,9 @@ class PayPalWPP(object):
 
         # Gather all NVP parameters to pass to a new instance.
         nvp_params = {}
-        for k, v in MergeDict(defaults, response_params).items():
-            if k in NVP_FIELDS:
-                nvp_params[str(k)] = v
+        for key, value in MergeDict(defaults, response_params).items():
+            if key.lower() in NVP_FIELDS:
+                nvp_params[str(key.lower())] = value
 
         # PayPal timestamp has to be formatted.
         if 'timestamp' in nvp_params:
@@ -291,5 +294,5 @@ class PayPalWPP(object):
         response_tokens = {}
         for kv in response.split('&'):
             key, value = kv.split("=")
-            response_tokens[key.lower()] = urllib.unquote(value)
+            response_tokens[key] = urllib.unquote(value)
         return response_tokens

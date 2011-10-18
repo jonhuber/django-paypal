@@ -211,11 +211,27 @@ class PayPalSharedSecretEncryptedPaymentsForm(PayPalEncryptedPaymentsForm):
             self.fields['notify_url'].initial += secret_param
 
 
+def upcase_keys(d):
+    upcased = {}
+    for key, value in d.iteritems():
+        upcased[key.upper()] = value
+    return upcased
+
+
 class PayPalStandardBaseForm(forms.ModelForm):
     """Form used to receive and record PayPal IPN/PDT."""
     # PayPal dates have non-standard formats.
-    time_created = forms.DateTimeField(required=False, input_formats=PAYPAL_DATE_FORMAT)
-    payment_date = forms.DateTimeField(required=False, input_formats=PAYPAL_DATE_FORMAT)
-    next_payment_date = forms.DateTimeField(required=False, input_formats=PAYPAL_DATE_FORMAT)
-    subscr_date = forms.DateTimeField(required=False, input_formats=PAYPAL_DATE_FORMAT)
-    subscr_effective = forms.DateTimeField(required=False, input_formats=PAYPAL_DATE_FORMAT)
+    time_created = forms.DateTimeField(
+        required=False, input_formats=PAYPAL_DATE_FORMAT)
+    payment_date = forms.DateTimeField(
+        required=False, input_formats=PAYPAL_DATE_FORMAT)
+    next_payment_date = forms.DateTimeField(
+        required=False, input_formats=PAYPAL_DATE_FORMAT)
+    subscr_date = forms.DateTimeField(
+        required=False, input_formats=PAYPAL_DATE_FORMAT)
+    subscr_effective = forms.DateTimeField(
+        required=False, input_formats=PAYPAL_DATE_FORMAT)
+
+    def __init__(self, **kwargs):
+        kwargs['data'] = upcase_keys(kwargs.get('data', {}))
+        super(PayPalStandardBaseForm, self).__init__(**kwargs)
