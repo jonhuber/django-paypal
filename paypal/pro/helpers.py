@@ -157,7 +157,7 @@ class PayPalWPP(object):
     def api_call(self, method, params, extra_requirements=None):
         assert method in API_METHODS
         params['METHOD'] = method
-        nvp = self._fetch(params, extra_requirement=extra_requirements)
+        nvp = self._fetch(params, extra_requirements=extra_requirements)
         if nvp.flag:
             raise PayPalFailure(nvp.flag_info)
         signal = API_METHODS[method].get('signal', None)
