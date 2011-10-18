@@ -13,7 +13,7 @@ from django.utils.datastructures import MergeDict
 from django.utils.http import urlencode
 
 from paypal.pro import signals
-from paypal.pro.models import PayPalNVP, L
+from paypal.pro.models import PayPalNVP
 from paypal.pro.exceptions import PayPalFailure
 
 TEST = settings.PAYPAL_TEST
