@@ -12,7 +12,7 @@ from django.forms.models import fields_for_model
 from django.utils.datastructures import MergeDict
 from django.utils.http import urlencode
 
-from paypal.pro.signals import *
+from paypal.pro import signals
 from paypal.pro.models import PayPalNVP, L
 from paypal.pro.exceptions import PayPalFailure
 
@@ -20,7 +20,7 @@ TEST = settings.PAYPAL_TEST
 USER = settings.PAYPAL_WPP_USER
 PASSWORD = settings.PAYPAL_WPP_PASSWORD
 SIGNATURE = settings.PAYPAL_WPP_SIGNATURE
-VERSION = 54.0
+VERSION = 74.0
 BASE_PARAMS = dict(USER=USER , PWD=PASSWORD, SIGNATURE=SIGNATURE, VERSION=VERSION)
 ENDPOINT = "https://api-3t.paypal.com/nvp"
 SANDBOX_ENDPOINT = "https://api-3t.sandbox.paypal.com/nvp"
@@ -30,6 +30,46 @@ NVP_FIELDS = fields_for_model(PayPalNVP).keys()
 EXPRESS_ENDPOINT = "https://www.paypal.com/webscr?cmd=_express-checkout&%s"
 SANDBOX_EXPRESS_ENDPOINT = \
     "https://www.sandbox.paypal.com/webscr?cmd=_express-checkout&%s"
+
+API_METHODS = {
+    'DoDirectPayment': {
+        'defaults': {"paymentaction": "Sale"},
+        'required': (
+            "creditcardtype acct expdate cvv2 ipaddress firstname lastname "
+            "street city state countrycode zip amt").split(),
+        'signal': signals.payment_was_successful,
+        },
+    'SetExpressCheckout': {
+        'required': ('RETURNURL', 'CANCELURL', 'AMT'),
+        'defaults': {'NOSHIPPING': '1'}
+        },
+    'GetExpressCheckoutDetails': {
+        'required': ('TOKEN',)
+        },
+    'ManageRecurringPaymentsProfileStatus': {
+        'required': ('PROFILEID', 'ACTION'),
+        'signal': signals.recurring_status_change,
+        },
+    'DoExpressCheckoutPayment': {
+        'defaults': {'PAYMENTACTION': 'Sale'},
+        'required': ('RETURNURL', 'CANCELURL', 'AMT', 'TOKEN', 'PAYERID'),
+        'signal': signals.payment_was_successful,
+        },
+    'GetTransactionDetails': {
+        'required': ('transactionid',),
+        },
+    'CreateRecurringPaymentsProfile': {
+        'required': (
+            'PROFILESTARTDATE', 'BILLINGPERIOD', 'BILLINGFREQUENCY', 'AMT'),
+        'signal': signals.payment_profile_created,
+        },
+    'UpdateRecurringPaymentsProfile': {
+        'required': ('PROFILEID',),
+        },
+    'GetRecurringPaymentsProfileDetails': {
+        'required': ('PROFILEID',),
+        },
+    }
 
 def paypal_time(time_obj=None):
     """Returns a time suitable for PayPal time fields."""
@@ -59,9 +99,9 @@ class PayPalWPP(object):
     Name-Value Pair API Developer Guide and Reference:
     https://cms.paypal.com/cms_content/US/en_US/files/developer/PP_NVPAPI_DeveloperGuide.pdf
     """
-    def __init__(self, request, params=BASE_PARAMS):
+    def __init__(self, request=None, params=BASE_PARAMS):
         """Required - USER / PWD / SIGNATURE / VERSION"""
-        self.request = request
+        self.request = request # can be None if necessary
         if TEST:
             self.endpoint = SANDBOX_ENDPOINT
         else:
@@ -71,12 +111,7 @@ class PayPalWPP(object):
 
     def doDirectPayment(self, params):
         """Call PayPal DoDirectPayment method."""
-        defaults = {"method": "DoDirectPayment", "paymentaction": "Sale"}
-        required = L("creditcardtype acct expdate cvv2 ipaddress firstname lastname street city state countrycode zip amt")
-        nvp_obj = self._fetch(params, required, defaults)
-        if nvp_obj.flag:
-            raise PayPalFailure(nvp_obj.flag_info)
-        payment_was_successful.send(params)
+        nvp_obj = self.api_call('DoDirectPayment', params)
         # @@@ Could check cvv2match / avscode are both 'X' or '0'
         # qd = django.http.QueryDict(nvp_obj.response)
         # if qd.get('cvv2match') not in ['X', '0']:
@@ -88,113 +123,89 @@ class PayPalWPP(object):
     def setExpressCheckout(self, params):
         """
         Initiates an Express Checkout transaction.
-        Optionally, the SetExpressCheckout API operation can set up billing agreements for
-        reference transactions and recurring payments.
+        Optionally, the SetExpressCheckout API operation can set up billing
+        agreements for reference transactions and recurring payments.
         Returns a NVP instance - check for token and payerid to continue!
         """
         if self._is_recurring(params):
             params = self._recurring_setExpressCheckout_adapter(params)
-
-        defaults = {"method": "SetExpressCheckout", "noshipping": 1}
-        required = L("returnurl cancelurl amt")
-        nvp_obj = self._fetch(params, required, defaults)
-        if nvp_obj.flag:
-            raise PayPalFailure(nvp_obj.flag_info)
+        self.api_call('SetExpressCheckout', params)
         return nvp_obj
 
     def doExpressCheckoutPayment(self, params):
         """
         Check the dude out:
         """
-        defaults = {"method": "DoExpressCheckoutPayment", "paymentaction": "Sale"}
-        required = L("returnurl cancelurl amt token payerid")
-        nvp_obj = self._fetch(params, required, defaults)
-        if nvp_obj.flag:
-            raise PayPalFailure(nvp_obj.flag_info)
-        payment_was_successful.send(params)
-        return nvp_obj
+        if self._is_recurring(params):
+            return wpp.createRecurringPaymentsProfile(params)
+        nvp = self.api_call('DoExpressCheckoutPayment', params)
+        return nvp
 
     def createRecurringPaymentsProfile(self, params, direct=False):
         """
-        Set direct to True to indicate that this is being called as a directPayment.
-        Returns True PayPal successfully creates the profile otherwise False.
+        Set direct to True to indicate that this is being called as a
+        directPayment. Returns True PayPal successfully creates the profile
+        otherwise False.
         """
-        defaults = {"method": "CreateRecurringPaymentsProfile"}
-        required = L("profilestartdate billingperiod billingfrequency amt")
+        extra_requirements = ('token',) if not direct else (
+            'creditcardtype', 'acct', 'expdate', 'firstname', 'lastname')
 
-        # Direct payments require CC data
-        if direct:
-            required + L("creditcardtype acct expdate firstname lastname")
-        else:
-            required + L("token payerid")
+        return self.api_call(
+            'CreateRecurringPaymentsProfile', params,
+            extra_requirements=extra_requirements)
 
-        nvp_obj = self._fetch(params, required, defaults)
-
-        # Flag if profile_type != ActiveProfile
-        if nvp_obj.flag:
-            raise PayPalFailure(nvp_obj.flag_info)
-        payment_profile_created.send(params)
-        return nvp_obj
+    def api_call(self, method, params, extra_requirements=None):
+        assert method in API_METHODS
+        params['METHOD'] = method
+        nvp = self._fetch(params, extra_requirement=extra_requirements)
+        if nvp.flag:
+            raise PayPalFailure(nvp.flag_info)
+        signal = API_METHODS[method].get('signal', None)
+        if signal:
+            signal.send(self, params=params, nvp=nvp)
+        return nvp
 
     def getExpressCheckoutDetails(self, params):
-        defaults = {"method": "GetExpressCheckoutDetails"}
-        required = L("token")
-        nvp_obj = self._fetch(params, required, defaults)
-        if nvp_obj.flag:
-            raise PayPalFailure(nvp_obj.flag_info)
-        return nvp_obj
+        return self.api_call('GetExpressCheckoutDetails', params)
 
     def setCustomerBillingAgreement(self, params):
         raise DeprecationWarning
 
     def getTransactionDetails(self, params):
-        defaults = {"method": "GetTransactionDetails"}
-        required = L("transactionid")
-
-        nvp_obj = self._fetch(params, required, defaults)
-        if nvp_obj.flag:
-            raise PayPalFailure(nvp_obj.flag_info)
-        return nvp_obj
+        return self.api_call('GetTransactionDetails', params)
 
     def massPay(self, params):
         raise NotImplementedError
 
     def getRecurringPaymentsProfileDetails(self, params):
-        raise NotImplementedError
+        return self.api_call('GetRecurringPaymentsProfileDetails', params)
 
     def updateRecurringPaymentsProfile(self, params):
-        defaults = {"method": "UpdateRecurringPaymentsProfile"}
-        required = L("profileid")
-
-        nvp_obj = self._fetch(params, required, defaults)
-        if nvp_obj.flag:
-            raise PayPalFailure(nvp_obj.flag_info)
-        return nvp_obj
+        return self.api_call('UpdateRecurringPaymentsProfile', params)
 
     def billOutstandingAmount(self, params):
         raise NotImplementedError
 
-    def manangeRecurringPaymentsProfileStatus(self, params, fail_silently=False):
+    def manangeRecurringPaymentsProfileStatus(
+        self, params, fail_silently=False):
         """
         Requires `profileid` and `action` params.
         Action must be either "Cancel", "Suspend", or "Reactivate".
         """
-        defaults = {"method": "ManageRecurringPaymentsProfileStatus"}
-        required = L("profileid action")
-
-        nvp_obj = self._fetch(params, required, defaults)
-
-        # TODO: This fail silently check should be using the error code, but its not easy to access
-        if not nvp_obj.flag or (fail_silently and nvp_obj.flag_info == 'Invalid profile status for cancel action; profile should be active or suspended'):
-            if params['action'] == 'Cancel':
-                recurring_cancel.send(sender=nvp_obj)
-            elif params['action'] == 'Suspend':
-                recurring_suspend.send(sender=nvp_obj)
-            elif params['action'] == 'Reactivate':
-                recurring_reactivate.send(sender=nvp_obj)
-        else:
-            raise PayPalFailure(nvp_obj.flag_info)
-        return nvp_obj
+        try:
+            nvp = self.api_call('ManageRecurringPaymentsProfileStatus', params)
+        except PayPalFailure:
+            if not(fail_silently and nvp.flag_info == (
+                'Invalid profile status for cancel action; '
+                'profile should be active or suspended')):
+                raise
+        if params['action'] == 'Cancel':
+            signals.recurring_cancel.send(self, params=params, nvp=nvp)
+        elif params['action'] == 'Suspend':
+            signals.recurring_suspend.send(self, params=params, nvp=nvp)
+        elif params['action'] == 'Reactivate':
+            signals.recurring_reactivate.send(self, params=params, nvp=nvp)
+        return nvp
 
     def refundTransaction(self, params):
         raise NotImplementedError
@@ -218,8 +229,14 @@ class PayPalWPP(object):
 
         return params
 
-    def _fetch(self, params, required, defaults):
+    def _fetch(self, params, required=None, defaults=None):
         """Make the NVP request and store the response."""
+        if required is None or defaults is None:
+            assert params['method'] in API_METHODS
+            if required is None:
+                required = API_METHODS[params['method']].get('required', ())
+            if defaults is None:
+                defaults = API_METHODS[params['method']].get('defaults', ())
         defaults.update(params)
         pp_params = self._check_and_update_params(required, defaults)
         pp_string = self.signature + urlencode(pp_params)

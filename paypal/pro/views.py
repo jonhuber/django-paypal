@@ -116,9 +116,6 @@ class PayPalPro(object):
         # Default to the rendering the payment form.
         return self.render_payment_form()
 
-    def is_recurring(self):
-        return self.item is not None and 'billingperiod' in self.item
-
     def should_redirect_to_express(self):
         return 'express' in self.request.GET
 
@@ -199,12 +196,8 @@ class PayPalPro(object):
             payerid=self.request.POST['PayerID'])
         self.item.update(pp_data)
 
-        # @@@ This check and call could be moved into PayPalWPP.
         try:
-            if self.is_recurring():
-                nvp_obj = wpp.createRecurringPaymentsProfile(self.item)
-            else:
-                nvp_obj = wpp.doExpressCheckoutPayment(self.item)
+            wpp.doExpressCheckoutPayment(self.item)
         except PayPalFailure:
             self.context['errors'] = self.errors['processing']
             return self.render_payment_form()

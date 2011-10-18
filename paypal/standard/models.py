@@ -24,6 +24,10 @@ try:
 except ImportError:
     Model = models.Model
 
+class PayPalManager(models.Manager):
+    def recurring(self):
+        return self.exclude(recurring_payment_id='')
+
 class PayPalStandardBase(Model):
     """
     Meta class for common variables shared by IPN and PDT:
@@ -229,6 +233,7 @@ class PayPalStandardBase(Model):
 
     # Where did it come from?
     from_view = models.CharField(max_length=6, null=True, blank=True)
+    objects = PayPalManager()
 
     class Meta:
         abstract = True

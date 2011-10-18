@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from string import split as L
-from django.db import models
-from django.utils.http import urlencode
-from django.forms.models import model_to_dict
 from django.contrib.auth.models import User
+from django.db import models
+from django.forms.models import model_to_dict
+from django.http import QueryDict
+from django.utils.http import urlencode
+
 try:
     from idmapper.models import SharedMemoryModel as Model
 except ImportError:
@@ -13,20 +14,22 @@ except ImportError:
 class PayPalNVP(Model):
     """Record of a NVP interaction with PayPal."""
     TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"  # 2009-02-03T17:47:41Z
-    RESTRICTED_FIELDS = L("expdate cvv2 acct")
-    ADMIN_FIELDS = L("id user flag flag_code flag_info query response "
-                     "created_at updated_at ")
-    ITEM_FIELDS = L("amt custom invnum")
-    DIRECT_FIELDS = L("firstname lastname street city state countrycode zip")
+    RESTRICTED_FIELDS = ('expdate', 'cvv2', 'acct')
+    ADMIN_FIELDS = (
+        'id user', 'flag', 'flag_code', 'flag_info', 'query', 'response',
+        'created_at', 'updated_at')
+    ITEM_FIELDS = ('amt', 'custom', 'invnum')
+    DIRECT_FIELDS = (
+        'firstname', 'lastname', 'street', 'city', 'state', 'countrycode',
+        'zip')
 
     # Response fields
     method = models.CharField(max_length=64, blank=True)
     ack = models.CharField(max_length=32, blank=True)
     profilestatus = models.CharField(max_length=32, blank=True)
     timestamp = models.DateTimeField(blank=True, null=True)
-    profileid = models.CharField(max_length=32, blank=True)  # I-E596DFUSD882
+    profileid = models.CharField(max_length=32, blank=True) # I-E596DFUSD882
     profilereference = models.CharField(max_length=128, blank=True)
-    # (PROFILEREFERENCE)
     correlationid = models.CharField(max_length=32, blank=True) # 25b380cda7a21
     token = models.CharField(max_length=64, blank=True)
     payerid = models.CharField(max_length=64, blank=True)
@@ -61,9 +64,10 @@ class PayPalNVP(Model):
 
     def init(self, request, paypal_request, paypal_response):
         """Initialize a PayPalNVP instance from a HttpRequest."""
-        self.ipaddress = request.META.get('REMOTE_ADDR', '').split(':')[0]
-        if hasattr(request, "user") and request.user.is_authenticated():
-            self.user = request.user
+        if request: # allow request=None
+            self.ipaddress = request.META.get('REMOTE_ADDR', '').split(':')[0]
+            if hasattr(request, "user") and request.user.is_authenticated():
+                self.user = request.user
 
         # No storing credit card info.
         query_data = dict(
@@ -108,3 +112,6 @@ class PayPalNVP(Model):
         # Create single payment:
         else:
             return wpp.doDirectPayment(params)
+
+    def get_response_param(self, param):
+        return QueryDict(self.response).get(param, None)
