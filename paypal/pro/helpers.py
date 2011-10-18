@@ -216,13 +216,16 @@ class PayPalWPP(object):
 
     def _recurring_setExpressCheckout_adapter(self, params):
         """
-        The recurring payment interface to SEC is different than the recurring payment
-        interface to ECP. This adapts a normal call to look like a SEC call.
+        The recurring payment interface to SEC is different than the recurring
+        payment interface to ECP. This adapts a normal call to look like a
+        SEC call.
         """
         params['l_billingtype0'] = "RecurringPayments"
         params['l_billingagreementdescription0'] = params['desc']
 
-        REMOVE = L("billingfrequency billingperiod profilestartdate desc")
+        REMOVE = (
+            'billingfrequency', 'billingperiod', 'profilestartdate', 'desc')
+
         for k in params.keys():
             if k in REMOVE:
                 del params[k]
@@ -257,7 +260,8 @@ class PayPalWPP(object):
 
         # PayPal timestamp has to be formatted.
         if 'timestamp' in nvp_params:
-            nvp_params['timestamp'] = paypaltime2datetime(nvp_params['timestamp'])
+            nvp_params['timestamp'] = paypaltime2datetime(
+                nvp_params['timestamp'])
 
         nvp_obj = PayPalNVP(**nvp_params)
         nvp_obj.init(self.request, params, response_params)
