@@ -232,7 +232,8 @@ class PayPalWPP(object):
 
         return params
 
-    def _fetch(self, params, required=None, defaults=None):
+    def _fetch(
+        self, params, required=None, defaults=None, extra_requirements=None):
         """Make the NVP request and store the response."""
         if required is None or defaults is None:
             assert params['method'] in API_METHODS
@@ -240,6 +241,7 @@ class PayPalWPP(object):
                 required = API_METHODS[params['method']].get('required', ())
             if defaults is None:
                 defaults = API_METHODS[params['method']].get('defaults', ())
+        required.update(extra_requirements or {})
         defaults.update(params)
         pp_params = self._check_and_update_params(required, defaults)
         pp_string = self.signature + urlencode(pp_params)
