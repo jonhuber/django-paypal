@@ -69,7 +69,7 @@ class PayPalNVP(Model):
             if hasattr(request, "user") and request.user.is_authenticated():
                 self.user = request.user
         else:
-            self.ipaddress = 'Internal'
+            self.ipaddress = ''
 
         # No storing credit card info.
         query_data = dict(
