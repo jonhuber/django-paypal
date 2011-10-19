@@ -211,11 +211,11 @@ class PayPalSharedSecretEncryptedPaymentsForm(PayPalEncryptedPaymentsForm):
             self.fields['notify_url'].initial += secret_param
 
 
-def upcase_keys(d):
-    upcased = {}
+def downcase_keys(d):
+    downcased = {}
     for key, value in d.iteritems():
-        upcased[key.upper()] = value
-    return upcased
+        downcased[key.lower()] = value
+    return downcased
 
 
 class PayPalStandardBaseForm(forms.ModelForm):
@@ -233,5 +233,5 @@ class PayPalStandardBaseForm(forms.ModelForm):
         required=False, input_formats=PAYPAL_DATE_FORMAT)
 
     def __init__(self, data=None, **kwargs):
-        data = upcase_keys(data) if data else None
+        data = downcase_keys(data) if data else None
         super(PayPalStandardBaseForm, self).__init__(data=data, **kwargs)
