@@ -189,7 +189,7 @@ class PayPalWPP(object):
     def billOutstandingAmount(self, params):
         raise NotImplementedError
 
-    def manangeRecurringPaymentsProfileStatus(
+    def manageRecurringPaymentsProfileStatus(
         self, params, fail_silently=False):
         """
         Requires `PROFILEID` and `ACTION` params.
