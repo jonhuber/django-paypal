@@ -68,6 +68,8 @@ class PayPalNVP(Model):
             self.ipaddress = request.META.get('REMOTE_ADDR', '').split(':')[0]
             if hasattr(request, "user") and request.user.is_authenticated():
                 self.user = request.user
+        else:
+            self.ipaddress = 'Internal'
 
         # No storing credit card info.
         query_data = dict(
