@@ -8,12 +8,6 @@ class Migration(SchemaMigration):
 
     def forwards(self, orm):
         
-        # Deleting field 'paypalipn.memo'
-        db.delete_column('paypal_ipn', 'memo')
-
-        # Adding field 'PayPalIPN.memov'
-        db.add_column('paypal_ipn', 'memov', self.gf('django.db.models.fields.CharField')(default='', max_length=255, blank=True), keep_default=False)
-
         # Changing field 'PayPalIPN.txn_id'
         db.alter_column('paypal_ipn', 'txn_id', self.gf('django.db.models.fields.CharField')(max_length=19))
 
@@ -34,12 +28,6 @@ class Migration(SchemaMigration):
         
         # Removing index on 'PayPalIPN', fields ['txn_id']
         db.delete_index('paypal_ipn', ['txn_id'])
-
-        # Adding field 'paypalipn.memo'
-        db.add_column('paypal_ipn', 'memo', self.gf('models.CharField')(default='', max_length=255, blank=True), keep_default=False)
-
-        # Deleting field 'PayPalIPN.memov'
-        db.delete_column('paypal_ipn', 'memov')
 
         # Changing field 'PayPalIPN.txn_id'
         db.alter_column('paypal_ipn', 'txn_id', self.gf('models.CharField')("Transaction ID", max_length=19))
@@ -109,7 +97,7 @@ class Migration(SchemaMigration):
             'mc_gross': ('django.db.models.fields.DecimalField', [], {'default': '0', 'null': 'True', 'max_digits': '64', 'decimal_places': '2', 'blank': 'True'}),
             'mc_handling': ('django.db.models.fields.DecimalField', [], {'default': '0', 'null': 'True', 'max_digits': '64', 'decimal_places': '2', 'blank': 'True'}),
             'mc_shipping': ('django.db.models.fields.DecimalField', [], {'default': '0', 'null': 'True', 'max_digits': '64', 'decimal_places': '2', 'blank': 'True'}),
-            'memov': ('django.db.models.fields.CharField', [], {'max_length': '255', 'blank': 'True'}),
+            'memo': ('django.db.models.fields.CharField', [], {'max_length': '255', 'blank': 'True'}),
             'next_payment_date': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'notify_version': ('django.db.models.fields.DecimalField', [], {'default': '0', 'null': 'True', 'max_digits': '64', 'decimal_places': '2', 'blank': 'True'}),
             'num_cart_items': ('django.db.models.fields.IntegerField', [], {'default': '0', 'null': 'True', 'blank': 'True'}),

@@ -104,7 +104,7 @@ class PayPalStandardBase(Model):
         max_digits=64, decimal_places=2, default=0, blank=True, null=True)
     mc_shipping = models.DecimalField(
         max_digits=64, decimal_places=2, default=0, blank=True, null=True)
-    memov = models.CharField(max_length=255, blank=True)
+    memo = models.CharField(max_length=255, blank=True)
     num_cart_items = models.IntegerField(blank=True, default=0, null=True)
     option_name1 = models.CharField(max_length=64, blank=True)
     option_name2 = models.CharField(max_length=64, blank=True)
