@@ -232,6 +232,6 @@ class PayPalStandardBaseForm(forms.ModelForm):
     subscr_effective = forms.DateTimeField(
         required=False, input_formats=PAYPAL_DATE_FORMAT)
 
-    def __init__(self, **kwargs):
-        kwargs['data'] = upcase_keys(kwargs.get('data', {}))
-        super(PayPalStandardBaseForm, self).__init__(**kwargs)
+    def __init__(self, data=None, **kwargs):
+        data = upcase_keys(data) if data else None
+        super(PayPalStandardBaseForm, self).__init__(data=data, **kwargs)
