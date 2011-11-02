@@ -197,8 +197,8 @@ class PayPalWPP(object):
         """
         try:
             nvp = self.api_call('ManageRecurringPaymentsProfileStatus', params)
-        except PayPalFailure:
-            if not(fail_silently and nvp.flag_info == (
+        except PayPalFailure, e:
+            if not(fail_silently and e.message == (
                 'Invalid profile status for cancel action; '
                 'profile should be active or suspended')):
                 raise
