@@ -117,3 +117,6 @@ class PayPalNVP(Model):
 
     def get_response_param(self, param):
         return QueryDict(self.response).get(param, None)
+
+    def get_query_param(self, param):
+        return QueryDict(self.query).get(param, None)
