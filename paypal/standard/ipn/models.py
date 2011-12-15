@@ -29,22 +29,19 @@ class PayPalIPN(PayPalStandardBase):
                 signals.payment_was_flagged.send(sender=self)
             else:
                 signals.payment_was_successful.send(sender=self)
-        # Recurring payment signals:
-        # XXX: Should these be merged with subscriptions?
-        elif self.is_recurring():
-            if self.is_recurring_create():
-                signals.recurring_create.send(sender=self)
-            elif self.is_recurring_payment():
-                signals.recurring_payment.send(sender=self)
-            elif self.is_recurring_cancel():
-                signals.recurring_cancel.send(sender=self)
-        # Subscription signals:
-        else:
-            if self.is_subscription_cancellation():
-                signals.subscription_cancel.send(sender=self)
-            elif self.is_subscription_signup():
-                signals.subscription_signup.send(sender=self)
-            elif self.is_subscription_end_of_term():
-                signals.subscription_eot.send(sender=self)
-            elif self.is_subscription_modified():
-                signals.subscription_modify.send(sender=self)
+
+        # Note that e.g. recurring_payment will send above and below
+        if self.is_recurring_create():
+            signals.recurring_create.send(sender=self)
+        elif self.is_recurring_payment():
+            signals.recurring_payment.send(sender=self)
+        elif self.is_recurring_cancel():
+            signals.recurring_cancel.send(sender=self)
+        elif self.is_subscription_cancellation():
+            signals.subscription_cancel.send(sender=self)
+        elif self.is_subscription_signup():
+            signals.subscription_signup.send(sender=self)
+        elif self.is_subscription_end_of_term():
+            signals.subscription_eot.send(sender=self)
+        elif self.is_subscription_modified():
+            signals.subscription_modify.send(sender=self)
