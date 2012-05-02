@@ -202,13 +202,14 @@ class PayPalWPP(object):
                 'Invalid profile status for cancel action; '
                 'profile should be active or suspended')):
                 raise
-        if params['ACTION'] == 'Cancel':
-            signals.recurring_cancel.send(self, params=params, nvp=nvp)
-        elif params['ACTION'] == 'Suspend':
-            signals.recurring_suspend.send(self, params=params, nvp=nvp)
-        elif params['ACTION'] == 'Reactivate':
-            signals.recurring_reactivate.send(self, params=params, nvp=nvp)
-        return nvp
+        else:
+            if params['ACTION'] == 'Cancel':
+                signals.recurring_cancel.send(self, params=params, nvp=nvp)
+            elif params['ACTION'] == 'Suspend':
+                signals.recurring_suspend.send(self, params=params, nvp=nvp)
+            elif params['ACTION'] == 'Reactivate':
+                signals.recurring_reactivate.send(self, params=params, nvp=nvp)
+            return nvp
 
     def refundTransaction(self, params):
         raise NotImplementedError
